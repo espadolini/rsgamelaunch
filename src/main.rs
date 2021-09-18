@@ -182,6 +182,8 @@ fn main() {
                 }
 
                 user_cur = Some(users::register(&new_username, &new_password, &new_contact));
+                menu_cur = &menus[1];
+                menu_hist.clear();
             }
 
             MenuAction::Login => {
