@@ -8,7 +8,7 @@ use rusqlite::{Connection, OpenFlags, OptionalExtension};
 pub(crate) struct User {
     pub(crate) username: String,
     password: String,
-    email: String,
+    contact: String,
     nologin: bool,
 }
 
@@ -19,13 +19,13 @@ fn open_users() -> Connection {
 pub(crate) fn get_user(username: &str) -> Option<User> {
     open_users()
         .query_row(
-            "SELECT username, password, email, nologin FROM users WHERE username COLLATE NOCASE = ?",
+            "SELECT username, password, contact, nologin FROM users WHERE username COLLATE NOCASE = ?",
             [&username],
             |r| {
                 Ok(User {
                     username: r.get("username")?,
                     password: r.get("password")?,
-                    email: r.get("email")?,
+                    contact: r.get("contact")?,
                     nologin: r.get("nologin")?,
                 })
             },
@@ -63,16 +63,16 @@ pub(crate) fn change_password(username: &str, password: &str) {
         .unwrap();
 }
 
-pub(crate) fn change_email(username: &str, email: &str) {
+pub(crate) fn change_contact(username: &str, contact: &str) {
     open_users()
         .execute(
-            "UPDATE users SET email = ? WHERE username = ?",
-            [email, username],
+            "UPDATE users SET contact = ? WHERE username = ?",
+            [contact, username],
         )
         .unwrap();
 }
 
-pub(crate) fn register(username: &str, password: &str, email: &str) -> User {
+pub(crate) fn register(username: &str, password: &str, contact: &str) -> User {
     let hashed_password = Argon2::default()
         .hash_password(password.as_bytes(), &SaltString::generate(&mut OsRng))
         .unwrap()
@@ -80,8 +80,8 @@ pub(crate) fn register(username: &str, password: &str, email: &str) -> User {
 
     open_users()
         .execute(
-            "INSERT INTO users (username, password, email, nologin) VALUES (?, ?, ?, 0)",
-            [username, &hashed_password, email],
+            "INSERT INTO users (username, password, contact, nologin) VALUES (?, ?, ?, 0)",
+            [username, &hashed_password, contact],
         )
         .unwrap();
 

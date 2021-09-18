@@ -8,7 +8,7 @@ enum MenuAction<'a> {
     Register,
     Login,
     ChangePassword,
-    ChangeEmail,
+    ChangeContact,
     Play(&'a str),
     EditRc(&'a str),
     Watch,
@@ -64,8 +64,8 @@ const MENUS: &[Menu] = &[
             },
             MenuEntry {
                 key: 'e',
-                name: "change current email address",
-                action: MenuAction::ChangeEmail,
+                name: "change current contact information",
+                action: MenuAction::ChangeContact,
             },
             MenuEntry {
                 key: 'n',
@@ -174,23 +174,14 @@ fn main() {
                     continue;
                 }
 
-                let new_email = ui::trimmed_input("new email > ");
-                let confirm_email = ui::trimmed_input("confirm new email > ");
-                if new_email != confirm_email {
-                    ui::flash_error("the emails don't match");
-                    continue;
-                }
-                if new_email.is_empty() {
+                let new_contact = ui::trimmed_input("contact information (email, IRC, discord) > ");
+                if new_contact.is_empty() {
                     ui::flash_error(
-                        "you won't be able to ask for a password reset with no email on record!",
+                        "you won't be able to ask for a password reset with no contact information on record!",
                     );
-                } else if !new_email.contains('@') {
-                    ui::flash_error(
-                        "the new email address doesn't contain a @, please make sure it's correct!",
-                    )
                 }
 
-                user_cur = Some(users::register(&new_username, &new_password, &new_email));
+                user_cur = Some(users::register(&new_username, &new_password, &new_contact));
             }
 
             MenuAction::Login => {
@@ -233,23 +224,16 @@ fn main() {
                 users::change_password(&user_cur.as_ref().unwrap().username, &new_password);
             }
 
-            MenuAction::ChangeEmail => {
+            MenuAction::ChangeContact => {
                 assert!(user_cur.is_some());
 
-                let new_email = ui::trimmed_input("new email > ");
-                let confirm_email = ui::trimmed_input("confirm new email > ");
-                if new_email != confirm_email {
-                    ui::flash_error("the emails don't match");
-                    continue;
-                }
-                if new_email.is_empty() {
-                    ui::flash_error("deleting email address on record - you won't be able to ask for a password reset!");
-                } else if !new_email.contains('@') {
+                let new_contact = ui::trimmed_input("contact information (email, IRC, discord) > ");
+                if new_contact.is_empty() {
                     ui::flash_error(
-                        "the new email address doesn't contain a @, please make sure it's correct!",
-                    )
+                        "deleting contact information - you won't be able to ask for a password reset!",
+                    );
                 }
-                users::change_email(&user_cur.as_ref().unwrap().username, &new_email);
+                users::change_contact(&user_cur.as_ref().unwrap().username, &new_contact);
             }
 
             MenuAction::Play(_) => todo!(),
