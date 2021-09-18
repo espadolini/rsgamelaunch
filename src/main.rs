@@ -1,113 +1,114 @@
 mod ui;
 mod users;
 
-enum MenuAction {
-    GoTo(&'static str),
+enum MenuAction<'a> {
+    GoTo(&'a str),
     Return,
     Quit,
     Register,
     Login,
     ChangePassword,
     ChangeEmail,
-    Play(&'static str),
-    EditRc(&'static str),
+    Play(&'a str),
+    EditRc(&'a str),
     Watch,
 }
 
-struct MenuEntry {
+struct MenuEntry<'a> {
     key: char,
-    name: &'static str,
-    action: MenuAction,
+    name: &'a str,
+    action: MenuAction<'a>,
 }
 
-struct Menu {
-    id: &'static str,
-    title: &'static str,
-    entries: &'static [MenuEntry],
+struct Menu<'a> {
+    id: &'a str,
+    title: &'a str,
+    entries: &'a [MenuEntry<'a>],
 }
+
+const MENUS: &[Menu] = &[
+    Menu {
+        id: "mainmenu_anon",
+        title: "Main menu",
+        entries: &[
+            MenuEntry {
+                key: 'l',
+                name: "login",
+                action: MenuAction::Login,
+            },
+            MenuEntry {
+                key: 'r',
+                name: "register",
+                action: MenuAction::Register,
+            },
+            MenuEntry {
+                key: 'w',
+                name: "watch games in progress",
+                action: MenuAction::Watch,
+            },
+            MenuEntry {
+                key: 'q',
+                name: "quit",
+                action: MenuAction::Quit,
+            },
+        ],
+    },
+    Menu {
+        id: "mainmenu_user",
+        title: "Main menu",
+        entries: &[
+            MenuEntry {
+                key: 'c',
+                name: "change current password",
+                action: MenuAction::ChangePassword,
+            },
+            MenuEntry {
+                key: 'e',
+                name: "change current email address",
+                action: MenuAction::ChangeEmail,
+            },
+            MenuEntry {
+                key: 'n',
+                name: "NetHack 3.4.3",
+                action: MenuAction::GoTo("nethack"),
+            },
+            MenuEntry {
+                key: 'w',
+                name: "watch games in progress",
+                action: MenuAction::Watch,
+            },
+            MenuEntry {
+                key: 'q',
+                name: "quit",
+                action: MenuAction::Quit,
+            },
+        ],
+    },
+    Menu {
+        id: "nethack",
+        title: "NetHack 3.4.3",
+        entries: &[
+            MenuEntry {
+                key: 'p',
+                name: "play",
+                action: MenuAction::Play("nethack"),
+            },
+            MenuEntry {
+                key: 'e',
+                name: "edit nethackrc",
+                action: MenuAction::EditRc("nethack/nethackrc"),
+            },
+            MenuEntry {
+                key: 'q',
+                name: "back",
+                action: MenuAction::Return,
+            },
+        ],
+    },
+];
 
 fn main() {
-    let menus = [
-        Menu {
-            id: "mainmenu_anon",
-            title: "Main menu",
-            entries: &[
-                MenuEntry {
-                    key: 'l',
-                    name: "login",
-                    action: MenuAction::Login,
-                },
-                MenuEntry {
-                    key: 'r',
-                    name: "register",
-                    action: MenuAction::Register,
-                },
-                MenuEntry {
-                    key: 'w',
-                    name: "watch games in progress",
-                    action: MenuAction::Watch,
-                },
-                MenuEntry {
-                    key: 'q',
-                    name: "quit",
-                    action: MenuAction::Quit,
-                },
-            ],
-        },
-        Menu {
-            id: "mainmenu_user",
-            title: "Main menu",
-            entries: &[
-                MenuEntry {
-                    key: 'c',
-                    name: "change current password",
-                    action: MenuAction::ChangePassword,
-                },
-                MenuEntry {
-                    key: 'e',
-                    name: "change current email address",
-                    action: MenuAction::ChangeEmail,
-                },
-                MenuEntry {
-                    key: 'n',
-                    name: "NetHack 3.4.3",
-                    action: MenuAction::GoTo("nethack"),
-                },
-                MenuEntry {
-                    key: 'w',
-                    name: "watch games in progress",
-                    action: MenuAction::Watch,
-                },
-                MenuEntry {
-                    key: 'q',
-                    name: "quit",
-                    action: MenuAction::Quit,
-                },
-            ],
-        },
-        Menu {
-            id: "nethack",
-            title: "NetHack 3.4.3",
-            entries: &[
-                MenuEntry {
-                    key: 'p',
-                    name: "play",
-                    action: MenuAction::Play("nethack"),
-                },
-                MenuEntry {
-                    key: 'e',
-                    name: "edit nethackrc",
-                    action: MenuAction::EditRc("nethack/nethackrc"),
-                },
-                MenuEntry {
-                    key: 'q',
-                    name: "back",
-                    action: MenuAction::Return,
-                },
-            ],
-        },
-    ];
-
+    let menus = MENUS;
     let mut menu_hist = Vec::new();
     let mut menu_cur = &menus[0];
     let mut user_cur: Option<users::User> = None;
