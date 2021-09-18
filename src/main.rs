@@ -114,12 +114,12 @@ fn main() {
     let mut user_cur: Option<users::User> = None;
 
     loop {
-        println!("\x1bc\n ## ascension.run - public NetHack server");
+        println!("\x1bc\n ## ascension.run - public NetHack server\n ##");
         match &user_cur {
-            Some(user) => println!(" ## currently logged in as: {}", user.username),
+            Some(user) => println!(" ## logged in as: {}", user.username),
             None => println!(" ## not logged in"),
         }
-        print!("\n {}:\n", menu_cur.title);
+        println!("\n {}:", menu_cur.title);
         for entry in menu_cur.entries {
             println!("  {}) {}", entry.key, entry.name);
         }
