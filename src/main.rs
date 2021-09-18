@@ -238,11 +238,73 @@ fn main() {
                 users::change_contact(&user_cur.as_ref().unwrap().username, &new_contact);
             }
 
-            MenuAction::Play(_) => todo!(),
-            MenuAction::EditRc(_) => todo!(),
+            MenuAction::Play(_) => run_game(),
+            MenuAction::EditRc(_) => run_editor(),
             MenuAction::Watch => todo!(),
         }
     }
 
     print!("\x1bc");
+}
+
+fn run_editor() {
+    use std::os::unix::process::CommandExt;
+
+    std::process::Command::new("nano")
+        .arg0("rnano")
+        .arg("nethackrc")
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap();
+}
+
+fn run_game() {
+    use std::io::{stdout, Read, Write};
+
+    let mut rec = std::fs::File::create("test.ttyrec").unwrap();
+
+    let mut child = std::process::Command::new("robotfindskitten")
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    let mut childout = child.stdout.take().unwrap();
+
+    let mut buf = Vec::with_capacity(16384);
+
+    loop {
+        buf.resize(1024, 0);
+        let len = childout.read(&mut buf).unwrap();
+        if len == 0 {
+            break; // EOF
+        }
+        buf.truncate(len);
+        let mut childout_nb = nonblock::NonBlockingReader::from_fd(childout).unwrap();
+        childout_nb.read_available(&mut buf).unwrap();
+
+        assert!(buf.len() <= u32::MAX as usize);
+
+        let now = unix_duration();
+        rec.write_all(&(now.as_secs() as u32).to_le_bytes())
+            .unwrap();
+        rec.write_all(&(now.subsec_micros() as u32).to_le_bytes())
+            .unwrap();
+        rec.write_all(&(buf.len() as u32).to_le_bytes()).unwrap();
+        rec.write_all(&buf).unwrap();
+        rec.flush().unwrap();
+
+        stdout().write_all(&buf).unwrap();
+        stdout().flush().unwrap();
+
+        childout = childout_nb.into_blocking().unwrap();
+    }
+
+    child.wait().unwrap();
+}
+
+fn unix_duration() -> std::time::Duration {
+    std::time::SystemTime::now()
+        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+        .unwrap()
 }
