@@ -108,6 +108,8 @@ const MENUS: &[Menu] = &[
 ];
 
 fn main() {
+    std::panic::set_hook(Box::new(|p| eprintln!("{}", p)));
+
     let menus = MENUS;
     let mut menu_hist = Vec::new();
     let mut menu_cur = &menus[0];
