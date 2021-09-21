@@ -12,7 +12,7 @@ pub(crate) struct User {
 }
 
 fn open_users() -> Connection {
-    Connection::open_with_flags("users.db", OpenFlags::SQLITE_OPEN_READ_WRITE).unwrap()
+    Connection::open_with_flags("rgldir/users.db", OpenFlags::SQLITE_OPEN_READ_WRITE).unwrap()
 }
 
 pub(crate) fn get_user(username: &str) -> Option<User> {

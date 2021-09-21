@@ -1,29 +1,41 @@
+use std::path::Path;
+
 mod ui;
 mod users;
 
-enum MenuAction<'a> {
+enum OverwriteBehavior {
+    OverwriteExisting,
+    IgnoreExisting,
+}
+
+enum Action<'a> {
     GoTo(&'a str),
     Return,
     Quit,
+    FlashMessage(&'a str),
+
     Register,
     Login,
     ChangePassword,
     ChangeContact,
-    Play(&'a str),
-    EditRc(&'a str),
+
+    RunGame(&'a str),
+    EditFile(&'a str),
+    CopyFile(&'a str, &'a str, OverwriteBehavior),
+
     Watch,
 }
 
-struct MenuEntry<'a> {
+struct Entry<'a> {
     key: char,
     name: &'a str,
-    action: MenuAction<'a>,
+    actions: &'a [Action<'a>],
 }
 
 struct Menu<'a> {
     id: &'a str,
     title: &'a str,
-    entries: &'a [MenuEntry<'a>],
+    entries: &'a [Entry<'a>],
 }
 
 const MENUS: &[Menu] = &[
@@ -31,25 +43,25 @@ const MENUS: &[Menu] = &[
         id: "mainmenu_anon",
         title: "Main menu",
         entries: &[
-            MenuEntry {
+            Entry {
                 key: 'l',
                 name: "login",
-                action: MenuAction::Login,
+                actions: &[Action::Login],
             },
-            MenuEntry {
+            Entry {
                 key: 'r',
                 name: "register",
-                action: MenuAction::Register,
+                actions: &[Action::Register],
             },
-            MenuEntry {
+            Entry {
                 key: 'w',
                 name: "watch games in progress",
-                action: MenuAction::Watch,
+                actions: &[Action::Watch],
             },
-            MenuEntry {
+            Entry {
                 key: 'q',
                 name: "quit",
-                action: MenuAction::Quit,
+                actions: &[Action::Quit],
             },
         ],
     },
@@ -57,30 +69,30 @@ const MENUS: &[Menu] = &[
         id: "mainmenu_user",
         title: "Main menu",
         entries: &[
-            MenuEntry {
+            Entry {
                 key: 'c',
                 name: "change current password",
-                action: MenuAction::ChangePassword,
+                actions: &[Action::ChangePassword],
             },
-            MenuEntry {
+            Entry {
                 key: 'e',
                 name: "change current contact information",
-                action: MenuAction::ChangeContact,
+                actions: &[Action::ChangeContact],
             },
-            MenuEntry {
+            Entry {
                 key: 'n',
                 name: "NetHack 3.4.3",
-                action: MenuAction::GoTo("nethack"),
+                actions: &[Action::GoTo("nethack")],
             },
-            MenuEntry {
+            Entry {
                 key: 'w',
                 name: "watch games in progress",
-                action: MenuAction::Watch,
+                actions: &[Action::Watch],
             },
-            MenuEntry {
+            Entry {
                 key: 'q',
                 name: "quit",
-                action: MenuAction::Quit,
+                actions: &[Action::Quit],
             },
         ],
     },
@@ -88,20 +100,63 @@ const MENUS: &[Menu] = &[
         id: "nethack",
         title: "NetHack 3.4.3",
         entries: &[
-            MenuEntry {
+            Entry {
                 key: 'p',
                 name: "play",
-                action: MenuAction::Play("nethack"),
+                actions: &[
+                    Action::CopyFile(
+                        "rgldir/nethackrc",
+                        "nethack/nethackrc",
+                        OverwriteBehavior::IgnoreExisting,
+                    ),
+                    Action::RunGame("nethack"),
+                ],
             },
-            MenuEntry {
+            Entry {
                 key: 'e',
                 name: "edit nethackrc",
-                action: MenuAction::EditRc("nethack/nethackrc"),
+                actions: &[
+                    Action::CopyFile(
+                        "rgldir/nethackrc",
+                        "nethack/nethackrc",
+                        OverwriteBehavior::IgnoreExisting,
+                    ),
+                    Action::EditFile("nethack/nethackrc"),
+                ],
             },
-            MenuEntry {
+            Entry {
+                key: 'r',
+                name: "reset nethackrc",
+                actions: &[Action::GoTo("nethack_reset")],
+            },
+            Entry {
                 key: 'q',
                 name: "back",
-                action: MenuAction::Return,
+                actions: &[Action::Return],
+            },
+        ],
+    },
+    Menu {
+        id: "nethack_reset",
+        title: "NetHack 3.4.3 rc file reset",
+        entries: &[
+            Entry {
+                key: 'R',
+                name: "confirm reset",
+                actions: &[
+                    Action::CopyFile(
+                        "rgldir/nethackrc",
+                        "nethack/nethackrc",
+                        OverwriteBehavior::OverwriteExisting,
+                    ),
+                    Action::FlashMessage("the nethackrc file was reset to default"),
+                    Action::Return,
+                ],
+            },
+            Entry {
+                key: 'q',
+                name: "back",
+                actions: &[Action::Return],
             },
         ],
     },
@@ -115,8 +170,8 @@ fn main() {
     let mut menu_cur = &menus[0];
     let mut user_cur: Option<users::User> = None;
 
-    loop {
-        println!("\x1bc\n ## ascension.run - public NetHack server\n ##");
+    'mainloop: loop {
+        println!("\x1b[2J\x1b[H\x1bm\n ## ascension.run - public NetHack server\n ##");
         match &user_cur {
             Some(user) => println!(" ## logged in as: {}", user.username),
             None => println!(" ## not logged in"),
@@ -127,134 +182,153 @@ fn main() {
         }
 
         let choice = ui::char_input("\n > ");
-        let choice = menu_cur.entries.iter().find(|&entry| choice == entry.key);
-        let choice = match choice {
-            Some(choice) => &choice.action,
-            None => continue,
+        let entry = menu_cur.entries.iter().find(|&entry| choice == entry.key);
+        let actions = match entry {
+            Some(entry) => {
+                println!("{}", choice);
+                entry.actions
+            }
+            None => {
+                println!("\x07");
+                continue;
+            }
         };
-        println!();
 
-        match *choice {
-            MenuAction::GoTo(id) => {
-                menu_hist.push(menu_cur);
-                menu_cur = menus.iter().find(|&menu| menu.id == id).unwrap();
-            }
-            MenuAction::Return => {
-                menu_cur = menu_hist.pop().unwrap();
-            }
-
-            MenuAction::Quit => {
-                break;
-            }
-
-            MenuAction::Register => {
-                assert!(user_cur.is_none());
-
-                let new_username = ui::trimmed_input("username > ");
-                if new_username.is_empty() {
-                    continue;
+        for action in actions {
+            match *action {
+                Action::GoTo(id) => {
+                    menu_hist.push(menu_cur);
+                    menu_cur = menus.iter().find(|&menu| menu.id == id).unwrap();
                 }
+                Action::Return => menu_cur = menu_hist.pop().unwrap(),
 
-                if !new_username.chars().all(|c| c.is_ascii_alphanumeric())
-                    || new_username.len() > 15
-                {
-                    ui::flash_error(
-                        "username must be ASCII alphanumeric and no longer than 15 characters",
-                    );
-                    continue;
-                }
+                Action::Quit => break 'mainloop,
+                Action::FlashMessage(msg) => ui::flash_message(msg),
 
-                if users::get_user(&new_username).is_some() {
-                    ui::flash_error("user already exists");
-                    continue;
-                }
+                Action::Register => {
+                    assert!(user_cur.is_none());
 
-                let new_password = ui::pass_input("new password > ");
-                let confirm_password = ui::pass_input("confirm new password > ");
-                if new_password != confirm_password {
-                    ui::flash_error("the passwords don't match");
-                    continue;
-                }
-
-                let new_contact = ui::trimmed_input("contact information (email, IRC, discord) > ");
-                if new_contact.is_empty() {
-                    ui::flash_error(
-                        "you won't be able to ask for a password reset with no contact information on record!",
-                    );
-                }
-
-                user_cur = Some(users::register(&new_username, &new_password, &new_contact));
-                menu_cur = &menus[1];
-                menu_hist.clear();
-            }
-
-            MenuAction::Login => {
-                assert!(user_cur.is_none());
-
-                let tentative_username = ui::trimmed_input("username > ");
-                if tentative_username.is_empty() {
-                    continue;
-                }
-                let user = match users::get_user(&tentative_username) {
-                    Some(user) => user,
-                    None => {
-                        ui::flash_error("no such user");
+                    let new_username = ui::trimmed_input("new username: ");
+                    if new_username.is_empty() {
                         continue;
                     }
-                };
 
-                let tentative_password = ui::pass_input("password > ");
-                user_cur = match users::try_login(user, &tentative_password) {
-                    Some(user) => Some(user),
-                    None => {
-                        ui::flash_error("login error");
+                    if !new_username.chars().all(|c| c.is_ascii_alphanumeric())
+                        || new_username.len() > 15
+                    {
+                        ui::flash_message(
+                            "username must be ASCII alphanumeric and no longer than 15 characters",
+                        );
                         continue;
                     }
-                };
 
-                menu_cur = &menus[1];
-                menu_hist.clear();
-            }
+                    if users::get_user(&new_username).is_some() {
+                        ui::flash_message("user already exists");
+                        continue;
+                    }
 
-            MenuAction::ChangePassword => {
-                assert!(user_cur.is_some());
+                    let new_password = ui::pass_input("new password: ");
+                    let confirm_password = ui::pass_input("confirm new password: ");
+                    if new_password != confirm_password {
+                        ui::flash_message("the passwords don't match");
+                        continue;
+                    }
 
-                let new_password = ui::pass_input("new password > ");
-                let confirm_password = ui::pass_input("confirm new password > ");
-                if new_password != confirm_password {
-                    ui::flash_error("the passwords don't match");
-                    continue;
+                    let new_contact =
+                        ui::trimmed_input("contact information (email, IRC, discord): ");
+
+                    user_cur = Some(users::register(&new_username, &new_password, &new_contact));
+                    let username = &user_cur.as_ref().unwrap().username;
+                    std::fs::create_dir_all(Path::new("rgldir/userdata").join(username)).unwrap();
+                    menu_cur = &menus[1];
+                    menu_hist.clear();
                 }
-                users::change_password(&user_cur.as_ref().unwrap().username, &new_password);
-            }
 
-            MenuAction::ChangeContact => {
-                assert!(user_cur.is_some());
+                Action::Login => {
+                    assert!(user_cur.is_none());
 
-                let new_contact = ui::trimmed_input("contact information (email, IRC, discord) > ");
-                if new_contact.is_empty() {
-                    ui::flash_error(
-                        "deleting contact information - you won't be able to ask for a password reset!",
-                    );
+                    let tentative_username = ui::trimmed_input("username: ");
+                    if tentative_username.is_empty() {
+                        continue;
+                    }
+                    let user = match users::get_user(&tentative_username) {
+                        Some(user) => user,
+                        None => {
+                            ui::flash_message("no such user");
+                            continue;
+                        }
+                    };
+
+                    let tentative_password = ui::pass_input("password: ");
+                    user_cur = users::try_login(user, &tentative_password);
+                    if user_cur.is_none() {
+                        ui::flash_message("login error");
+                        continue;
+                    }
+
+                    let username = &user_cur.as_ref().unwrap().username;
+                    std::fs::create_dir_all(Path::new("rgldir/userdata").join(username)).unwrap();
+                    menu_cur = &menus[1];
+                    menu_hist.clear();
                 }
-                users::change_contact(&user_cur.as_ref().unwrap().username, &new_contact);
-            }
 
-            MenuAction::Play(_) => run_game(),
-            MenuAction::EditRc(_) => run_editor(),
-            MenuAction::Watch => todo!(),
+                Action::ChangePassword => {
+                    assert!(user_cur.is_some());
+
+                    let new_password = ui::pass_input("new password: ");
+                    let confirm_password = ui::pass_input("confirm new password: ");
+                    if new_password != confirm_password {
+                        ui::flash_message("the passwords don't match");
+                        continue;
+                    }
+                    users::change_password(&user_cur.as_ref().unwrap().username, &new_password);
+                }
+
+                Action::ChangeContact => {
+                    assert!(user_cur.is_some());
+
+                    let new_contact =
+                        ui::trimmed_input("contact information (email, IRC, discord): ");
+                    if new_contact.is_empty() {
+                        ui::flash_message("deleting contact information");
+                    }
+                    users::change_contact(&user_cur.as_ref().unwrap().username, &new_contact);
+                }
+
+                Action::RunGame(_) => run_game(),
+                Action::EditFile(path) => {
+                    let username = &user_cur.as_ref().unwrap().username;
+                    let mut pathbuf = Path::new("rgldir/userdata").join(username);
+                    pathbuf.push(path);
+                    std::fs::create_dir_all(pathbuf.parent().unwrap()).unwrap();
+                    run_editor(&pathbuf);
+                }
+
+                Action::CopyFile(src, dst, ref overwrite) => {
+                    let username = &user_cur.as_ref().unwrap().username;
+                    let mut pathbuf = Path::new("rgldir/userdata").join(username);
+                    pathbuf.push(dst);
+
+                    if matches!(overwrite, OverwriteBehavior::OverwriteExisting)
+                        || !pathbuf.exists()
+                    {
+                        std::fs::create_dir_all(pathbuf.parent().unwrap()).unwrap();
+                        std::fs::copy(src, pathbuf).unwrap();
+                    }
+                }
+
+                Action::Watch => todo!(),
+            }
         }
     }
-
-    print!("\x1bc");
 }
 
-fn run_editor() {
+fn run_editor(path: &Path) {
     use std::os::unix::process::CommandExt;
 
     std::process::Command::new("nano")
         .arg0("rnano")
-        .arg("nethackrc")
+        .arg(path)
         .spawn()
         .unwrap()
         .wait()

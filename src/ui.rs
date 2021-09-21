@@ -64,7 +64,7 @@ pub(crate) fn char_input(prompt: &str) -> char {
     panic!("eof")
 }
 
-pub(crate) fn flash_error(msg: &str) {
+pub(crate) fn flash_message(msg: &str) {
     println!("{}", msg);
     sleep(Duration::from_secs(2));
 }
