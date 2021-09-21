@@ -7,9 +7,8 @@ use rusqlite::{Connection, OpenFlags, OptionalExtension};
 #[derive(Debug)]
 pub(crate) struct User {
     pub(crate) username: String,
-    password: String,
+    pwhash: Option<String>,
     contact: String,
-    nologin: bool,
 }
 
 fn open_users() -> Connection {
@@ -19,14 +18,13 @@ fn open_users() -> Connection {
 pub(crate) fn get_user(username: &str) -> Option<User> {
     open_users()
         .query_row(
-            "SELECT username, password, contact, nologin FROM users WHERE username COLLATE NOCASE = ?",
+            "SELECT username, pwhash, contact FROM users WHERE username COLLATE NOCASE = ?",
             [&username],
             |r| {
                 Ok(User {
                     username: r.get("username")?,
-                    password: r.get("password")?,
+                    pwhash: r.get("pwhash")?,
                     contact: r.get("contact")?,
-                    nologin: r.get("nologin")?,
                 })
             },
         )
@@ -34,31 +32,26 @@ pub(crate) fn get_user(username: &str) -> Option<User> {
         .unwrap()
 }
 
-pub(crate) fn try_login(user: User, password: &str) -> Option<User> {
-    if user.nologin {
-        return None;
-    }
-
+pub(crate) fn try_login(mut user: User, password: &str) -> Option<User> {
     Argon2::default()
         .verify_password(
             password.as_bytes(),
-            &PasswordHash::new(&user.password).unwrap(),
+            &PasswordHash::new(&user.pwhash.take()?).unwrap(),
         )
-        .ok()?;
-
-    Some(user)
+        .ok()
+        .and(Some(user))
 }
 
 pub(crate) fn change_password(username: &str, password: &str) {
-    let hashed_password = Argon2::default()
+    let pwhash = Argon2::default()
         .hash_password(password.as_bytes(), &SaltString::generate(&mut OsRng))
         .unwrap()
         .to_string();
 
     open_users()
         .execute(
-            "UPDATE users SET password = ? WHERE username = ?",
-            [hashed_password.as_str(), username],
+            "UPDATE users SET pwhash = ? WHERE username = ?",
+            [&pwhash, username],
         )
         .unwrap();
 }
@@ -73,15 +66,15 @@ pub(crate) fn change_contact(username: &str, contact: &str) {
 }
 
 pub(crate) fn register(username: &str, password: &str, contact: &str) -> User {
-    let hashed_password = Argon2::default()
+    let pwhash = Argon2::default()
         .hash_password(password.as_bytes(), &SaltString::generate(&mut OsRng))
         .unwrap()
         .to_string();
 
     open_users()
         .execute(
-            "INSERT INTO users (username, password, contact, nologin) VALUES (?, ?, ?, 0)",
-            [username, &hashed_password, contact],
+            "INSERT INTO users (username, pwhash, contact) VALUES (?, ?, ?)",
+            [username, &pwhash, contact],
         )
         .unwrap();
 
