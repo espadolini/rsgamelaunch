@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    borrow::Cow,
+    path::{Path, PathBuf},
+};
 
 mod ui;
 mod users;
@@ -6,6 +9,30 @@ mod users;
 enum OverwriteBehavior {
     OverwriteExisting,
     IgnoreExisting,
+}
+
+enum PathSpec<'a> {
+    UserDir(&'a str),
+    Normal(&'a str),
+}
+
+fn userdir(username: &str) -> PathBuf {
+    let pathbuf = Path::new("rgldir/userdata").join(username);
+    std::fs::create_dir_all(&pathbuf).unwrap();
+    pathbuf
+}
+
+impl PathSpec<'_> {
+    fn resolve(&self, username: &str) -> Cow<Path> {
+        match self {
+            Self::UserDir(p) => {
+                let mut pb = userdir(username);
+                pb.push(p);
+                pb.into()
+            }
+            Self::Normal(p) => Path::new(p).into(),
+        }
+    }
 }
 
 enum Action<'a> {
@@ -20,8 +47,8 @@ enum Action<'a> {
     ChangeContact,
 
     RunGame(&'a str),
-    EditFile(&'a str),
-    CopyFile(&'a str, &'a str, OverwriteBehavior),
+    EditFile(PathSpec<'a>),
+    CopyFile(PathSpec<'a>, PathSpec<'a>, OverwriteBehavior),
 
     Watch,
 }
@@ -105,8 +132,8 @@ const MENUS: &[Menu] = &[
                 name: "play",
                 actions: &[
                     Action::CopyFile(
-                        "rgldir/nethackrc",
-                        "nethack/nethackrc",
+                        PathSpec::Normal("rgldir/nethackrc"),
+                        PathSpec::UserDir("nethack/nethackrc"),
                         OverwriteBehavior::IgnoreExisting,
                     ),
                     Action::RunGame("nethack"),
@@ -117,11 +144,11 @@ const MENUS: &[Menu] = &[
                 name: "edit nethackrc",
                 actions: &[
                     Action::CopyFile(
-                        "rgldir/nethackrc",
-                        "nethack/nethackrc",
+                        PathSpec::Normal("rgldir/nethackrc"),
+                        PathSpec::UserDir("nethack/nethackrc"),
                         OverwriteBehavior::IgnoreExisting,
                     ),
-                    Action::EditFile("nethack/nethackrc"),
+                    Action::EditFile(PathSpec::UserDir("nethack/nethackrc")),
                 ],
             },
             Entry {
@@ -145,8 +172,8 @@ const MENUS: &[Menu] = &[
                 name: "confirm reset",
                 actions: &[
                     Action::CopyFile(
-                        "rgldir/nethackrc",
-                        "nethack/nethackrc",
+                        PathSpec::Normal("rgldir/nethackrc"),
+                        PathSpec::UserDir("nethack/nethackrc"),
                         OverwriteBehavior::OverwriteExisting,
                     ),
                     Action::FlashMessage("the nethackrc file was reset to default"),
@@ -195,10 +222,10 @@ fn main() {
         };
 
         for action in actions {
-            match *action {
+            match action {
                 Action::GoTo(id) => {
                     menu_hist.push(menu_cur);
-                    menu_cur = menus.iter().find(|&menu| menu.id == id).unwrap();
+                    menu_cur = menus.iter().find(|&menu| menu.id == *id).unwrap();
                 }
                 Action::Return => menu_cur = menu_hist.pop().unwrap(),
 
@@ -297,23 +324,20 @@ fn main() {
                 Action::RunGame(_) => run_game(),
                 Action::EditFile(path) => {
                     let username = &user_cur.as_ref().unwrap().username;
-                    let mut pathbuf = userdir(username);
-                    pathbuf.push(path);
+                    let path = path.resolve(username);
 
-                    std::fs::create_dir_all(pathbuf.parent().unwrap()).unwrap();
-                    run_editor(&pathbuf);
+                    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+                    run_editor(&path);
                 }
 
-                Action::CopyFile(src, dst, ref overwrite) => {
+                Action::CopyFile(src, dst, overwrite) => {
                     let username = &user_cur.as_ref().unwrap().username;
-                    let mut pathbuf = userdir(username);
-                    pathbuf.push(dst);
+                    let src = src.resolve(username);
+                    let dst = dst.resolve(username);
 
-                    if matches!(overwrite, OverwriteBehavior::OverwriteExisting)
-                        || !pathbuf.exists()
-                    {
-                        std::fs::create_dir_all(pathbuf.parent().unwrap()).unwrap();
-                        std::fs::copy(src, pathbuf).unwrap();
+                    if matches!(overwrite, OverwriteBehavior::OverwriteExisting) || !dst.exists() {
+                        std::fs::create_dir_all(dst.parent().unwrap()).unwrap();
+                        std::fs::copy(src, dst).unwrap();
                     }
                 }
 
@@ -321,12 +345,6 @@ fn main() {
             }
         }
     }
-}
-
-fn userdir(username: &str) -> PathBuf {
-    let pathbuf = Path::new("rgldir/userdata").join(username);
-    std::fs::create_dir_all(&pathbuf).unwrap();
-    pathbuf
 }
 
 fn run_editor(path: &Path) {
