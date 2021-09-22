@@ -3,6 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+mod config;
 mod ui;
 mod users;
 
@@ -17,7 +18,7 @@ enum PathSpec<'a> {
 }
 
 fn userdir(username: &str) -> PathBuf {
-    let pathbuf = Path::new("rgldir/userdata").join(username);
+    let pathbuf = Path::new(config::USERDIR_ROOT).join(username);
     std::fs::create_dir_all(&pathbuf).unwrap();
     pathbuf
 }
@@ -65,134 +66,10 @@ struct Menu<'a> {
     entries: &'a [Entry<'a>],
 }
 
-const MENUS: &[Menu] = &[
-    Menu {
-        id: "mainmenu_anon",
-        title: "Main menu",
-        entries: &[
-            Entry {
-                key: 'l',
-                name: "login",
-                actions: &[Action::Login],
-            },
-            Entry {
-                key: 'r',
-                name: "register",
-                actions: &[Action::Register],
-            },
-            Entry {
-                key: 'w',
-                name: "watch games in progress",
-                actions: &[Action::Watch],
-            },
-            Entry {
-                key: 'q',
-                name: "quit",
-                actions: &[Action::Quit],
-            },
-        ],
-    },
-    Menu {
-        id: "mainmenu_user",
-        title: "Main menu",
-        entries: &[
-            Entry {
-                key: 'c',
-                name: "change current password",
-                actions: &[Action::ChangePassword],
-            },
-            Entry {
-                key: 'e',
-                name: "change current contact information",
-                actions: &[Action::ChangeContact],
-            },
-            Entry {
-                key: 'n',
-                name: "NetHack 3.4.3",
-                actions: &[Action::GoTo("nethack")],
-            },
-            Entry {
-                key: 'w',
-                name: "watch games in progress",
-                actions: &[Action::Watch],
-            },
-            Entry {
-                key: 'q',
-                name: "quit",
-                actions: &[Action::Quit],
-            },
-        ],
-    },
-    Menu {
-        id: "nethack",
-        title: "NetHack 3.4.3",
-        entries: &[
-            Entry {
-                key: 'p',
-                name: "play",
-                actions: &[
-                    Action::CopyFile(
-                        PathSpec::Normal("rgldir/nethackrc"),
-                        PathSpec::UserDir("nethack/nethackrc"),
-                        OverwriteBehavior::IgnoreExisting,
-                    ),
-                    Action::RunGame("nethack"),
-                ],
-            },
-            Entry {
-                key: 'e',
-                name: "edit nethackrc",
-                actions: &[
-                    Action::CopyFile(
-                        PathSpec::Normal("rgldir/nethackrc"),
-                        PathSpec::UserDir("nethack/nethackrc"),
-                        OverwriteBehavior::IgnoreExisting,
-                    ),
-                    Action::EditFile(PathSpec::UserDir("nethack/nethackrc")),
-                ],
-            },
-            Entry {
-                key: 'r',
-                name: "reset nethackrc",
-                actions: &[Action::GoTo("nethack_reset")],
-            },
-            Entry {
-                key: 'q',
-                name: "back",
-                actions: &[Action::Return],
-            },
-        ],
-    },
-    Menu {
-        id: "nethack_reset",
-        title: "NetHack 3.4.3 rc file reset",
-        entries: &[
-            Entry {
-                key: 'R',
-                name: "confirm reset",
-                actions: &[
-                    Action::CopyFile(
-                        PathSpec::Normal("rgldir/nethackrc"),
-                        PathSpec::UserDir("nethack/nethackrc"),
-                        OverwriteBehavior::OverwriteExisting,
-                    ),
-                    Action::FlashMessage("the nethackrc file was reset to default"),
-                    Action::Return,
-                ],
-            },
-            Entry {
-                key: 'q',
-                name: "back",
-                actions: &[Action::Return],
-            },
-        ],
-    },
-];
-
 fn main() {
     std::panic::set_hook(Box::new(|p| eprintln!("{}", p)));
 
-    let menus = MENUS;
+    let menus = config::MENUS;
     let mut menu_hist = Vec::new();
     let mut menu_cur = &menus[0];
     let mut user_cur: Option<users::User> = None;
