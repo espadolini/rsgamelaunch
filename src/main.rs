@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 mod ui;
 mod users;
@@ -238,8 +238,8 @@ fn main() {
                         ui::trimmed_input("contact information (email, IRC, discord): ");
 
                     user_cur = Some(users::register(&new_username, &new_password, &new_contact));
-                    let username = &user_cur.as_ref().unwrap().username;
-                    std::fs::create_dir_all(Path::new("rgldir/userdata").join(username)).unwrap();
+
+                    userdir(&user_cur.as_ref().unwrap().username);
                     menu_cur = &menus[1];
                     menu_hist.clear();
                 }
@@ -266,8 +266,7 @@ fn main() {
                         continue;
                     }
 
-                    let username = &user_cur.as_ref().unwrap().username;
-                    std::fs::create_dir_all(Path::new("rgldir/userdata").join(username)).unwrap();
+                    userdir(&user_cur.as_ref().unwrap().username);
                     menu_cur = &menus[1];
                     menu_hist.clear();
                 }
@@ -298,15 +297,16 @@ fn main() {
                 Action::RunGame(_) => run_game(),
                 Action::EditFile(path) => {
                     let username = &user_cur.as_ref().unwrap().username;
-                    let mut pathbuf = Path::new("rgldir/userdata").join(username);
+                    let mut pathbuf = userdir(username);
                     pathbuf.push(path);
+
                     std::fs::create_dir_all(pathbuf.parent().unwrap()).unwrap();
                     run_editor(&pathbuf);
                 }
 
                 Action::CopyFile(src, dst, ref overwrite) => {
                     let username = &user_cur.as_ref().unwrap().username;
-                    let mut pathbuf = Path::new("rgldir/userdata").join(username);
+                    let mut pathbuf = userdir(username);
                     pathbuf.push(dst);
 
                     if matches!(overwrite, OverwriteBehavior::OverwriteExisting)
@@ -321,6 +321,12 @@ fn main() {
             }
         }
     }
+}
+
+fn userdir(username: &str) -> PathBuf {
+    let pathbuf = Path::new("rgldir/userdata").join(username);
+    std::fs::create_dir_all(&pathbuf).unwrap();
+    pathbuf
 }
 
 fn run_editor(path: &Path) {
