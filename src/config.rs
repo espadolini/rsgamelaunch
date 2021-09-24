@@ -103,25 +103,51 @@ pub(crate) const MENUS: &[Menu] = &[
     },
     Menu {
         id: "nethack_reset",
-        title: "NetHack 3.4.3 rc file reset",
+        title: "NetHack 3.4.3",
         entries: &[
             Entry {
-                key: 'R',
-                name: "confirm reset",
+                key: 'p',
+                name: "play",
                 actions: &[
+                    Return,
+                    CopyFile(
+                        Normal("rgldir/nethackrc"),
+                        UserDir("nethack/nethackrc"),
+                        IgnoreExisting,
+                    ),
+                    RunGame("nethack"),
+                ],
+            },
+            Entry {
+                key: 'e',
+                name: "edit nethackrc",
+                actions: &[
+                    Return,
+                    CopyFile(
+                        Normal("rgldir/nethackrc"),
+                        UserDir("nethack/nethackrc"),
+                        IgnoreExisting,
+                    ),
+                    EditFile(UserDir("nethack/nethackrc")),
+                ],
+            },
+            Entry {
+                key: 'R',
+                name: "confirm reset?",
+                actions: &[
+                    Return,
                     CopyFile(
                         Normal("rgldir/nethackrc"),
                         UserDir("nethack/nethackrc"),
                         OverwriteExisting,
                     ),
                     FlashMessage("the nethackrc file was reset to default"),
-                    Return,
                 ],
             },
             Entry {
                 key: 'q',
                 name: "back",
-                actions: &[Return],
+                actions: &[Return, Return],
             },
         ],
     },
