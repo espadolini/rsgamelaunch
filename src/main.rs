@@ -1,29 +1,35 @@
+use serde::Deserialize;
 use std::{
     borrow::Cow,
     path::{Path, PathBuf},
 };
 
-mod config;
 mod ui;
 mod users;
 
+const USERDIR_ROOT: &str = "rgldir/userdata";
+const USERDB: &str = "rgldir/users.db";
+const CONFIG_PATH: &str = "rgldir/config.yaml";
+
+#[derive(Deserialize)]
 enum OverwriteBehavior {
     OverwriteExisting,
     IgnoreExisting,
 }
 
-enum PathSpec<'a> {
-    UserDir(&'a str),
-    Normal(&'a str),
+#[derive(Deserialize)]
+enum PathSpec {
+    UserDir(String),
+    Normal(String),
 }
 
 fn userdir(username: &str) -> PathBuf {
-    let pathbuf = Path::new(config::USERDIR_ROOT).join(username);
+    let pathbuf = Path::new(USERDIR_ROOT).join(username);
     std::fs::create_dir_all(&pathbuf).unwrap();
     pathbuf
 }
 
-impl PathSpec<'_> {
+impl PathSpec {
     fn resolve(&self, username: &str) -> Cow<Path> {
         match self {
             Self::UserDir(p) => {
@@ -36,40 +42,50 @@ impl PathSpec<'_> {
     }
 }
 
-enum Action<'a> {
-    GoTo(&'a str),
+#[derive(Deserialize)]
+enum Action {
+    GoTo(String),
     Return,
     Quit,
-    FlashMessage(&'a str),
+    FlashMessage(String),
 
     Register,
     Login,
     ChangePassword,
     ChangeContact,
 
-    RunGame(&'a str),
-    EditFile(PathSpec<'a>),
-    CopyFile(PathSpec<'a>, PathSpec<'a>, OverwriteBehavior),
+    RunGame(String),
+    EditFile(PathSpec),
+    CopyFile(PathSpec, PathSpec, OverwriteBehavior),
 
     Watch,
 }
 
-struct Entry<'a> {
+#[derive(Deserialize)]
+struct Entry {
     key: char,
-    name: &'a str,
-    actions: &'a [Action<'a>],
+    name: String,
+    actions: Vec<Action>,
 }
 
-struct Menu<'a> {
-    id: &'a str,
-    title: &'a str,
-    entries: &'a [Entry<'a>],
+#[derive(Deserialize)]
+struct Menu {
+    id: String,
+    title: String,
+    entries: Vec<Entry>,
+}
+
+#[derive(Deserialize)]
+struct Config {
+    menus: Vec<Menu>,
 }
 
 fn main() {
     std::panic::set_hook(Box::new(|p| eprintln!("{}", p)));
 
-    let menus = config::MENUS;
+    let Config { menus } =
+        serde_yaml::from_reader(std::fs::File::open(CONFIG_PATH).unwrap()).unwrap();
+
     let mut menu_hist = Vec::new();
     let mut menu_cur = &menus[0];
     let mut user_cur: Option<users::User> = None;
@@ -81,16 +97,16 @@ fn main() {
             None => println!(" ## not logged in"),
         }
         println!("\n {}:", menu_cur.title);
-        for entry in menu_cur.entries {
+        for entry in &menu_cur.entries {
             println!("  {}) {}", entry.key, entry.name);
         }
 
         let choice = ui::char_input("\n > ");
-        let entry = menu_cur.entries.iter().find(|&entry| choice == entry.key);
+        let entry = &menu_cur.entries.iter().find(|entry| choice == entry.key);
         let actions = match entry {
             Some(entry) => {
                 println!("{}", choice);
-                entry.actions
+                &entry.actions
             }
             None => {
                 println!("\x07");

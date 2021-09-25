@@ -11,3 +11,5 @@ termion = "1.5"
 termios = "0.3"
 trim-in-place = "0.1"
 nonblock = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.8"
