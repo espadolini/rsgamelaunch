@@ -9,7 +9,7 @@ mod users;
 
 const USERDIR_ROOT: &str = "rgldir/userdata";
 const USERDB: &str = "rgldir/users.db";
-const CONFIG_PATH: &str = "rgldir/config.yaml";
+const CONFIG_PATH: &str = "rgldir/config.ron";
 
 #[derive(Deserialize)]
 enum OverwriteBehavior {
@@ -76,15 +76,21 @@ struct Menu {
 }
 
 #[derive(Deserialize)]
+struct Game {
+    id: String,
+}
+
+#[derive(Deserialize)]
 struct Config {
     menus: Vec<Menu>,
+    games: Vec<Game>,
 }
 
 fn main() {
     std::panic::set_hook(Box::new(|p| eprintln!("{}", p)));
 
-    let Config { menus } =
-        serde_yaml::from_reader(std::fs::File::open(CONFIG_PATH).unwrap()).unwrap();
+    let Config { menus, games } =
+        ron::from_str(&std::fs::read_to_string(CONFIG_PATH).unwrap()).unwrap();
 
     let mut menu_hist = Vec::new();
     let mut menu_cur = &menus[0];
@@ -214,7 +220,10 @@ fn main() {
                     users::change_contact(&user_cur.as_ref().unwrap().username, &new_contact);
                 }
 
-                Action::RunGame(_) => run_game(),
+                Action::RunGame(id) => run_game(
+                    user_cur.as_ref().unwrap(),
+                    games.iter().find(|g| &g.id == id).unwrap(),
+                ),
                 Action::EditFile(path) => {
                     let username = &user_cur.as_ref().unwrap().username;
                     let path = path.resolve(username);
@@ -252,7 +261,9 @@ fn run_editor(path: &Path) {
         .unwrap();
 }
 
-fn run_game() {
+fn run_game(user: &users::User, game: &Game) {
+    let _ = user;
+    let _ = game;
     use std::io::{stdout, Read, Write};
 
     let mut rec = std::fs::File::create("test.ttyrec").unwrap();
