@@ -1,7 +1,11 @@
 use serde::Deserialize;
 use std::{
     borrow::Cow,
+    fs,
+    io::{self, Read, Write},
     path::{Path, PathBuf},
+    process,
+    time::{Duration, SystemTime},
 };
 
 mod ui;
@@ -25,7 +29,7 @@ enum PathSpec {
 
 fn userdir(username: &str) -> PathBuf {
     let pathbuf = Path::new(USERDIR_ROOT).join(username);
-    std::fs::create_dir_all(&pathbuf).unwrap();
+    fs::create_dir_all(&pathbuf).unwrap();
     pathbuf
 }
 
@@ -89,8 +93,7 @@ struct Config {
 fn main() {
     std::panic::set_hook(Box::new(|p| eprintln!("{}", p)));
 
-    let Config { menus, games } =
-        ron::from_str(&std::fs::read_to_string(CONFIG_PATH).unwrap()).unwrap();
+    let Config { menus, games } = ron::from_str(&fs::read_to_string(CONFIG_PATH).unwrap()).unwrap();
 
     let mut menu_hist = Vec::new();
     let mut menu_cur = &menus[0];
@@ -228,7 +231,7 @@ fn main() {
                     let username = &user_cur.as_ref().unwrap().username;
                     let path = path.resolve(username);
 
-                    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+                    fs::create_dir_all(path.parent().unwrap()).unwrap();
                     run_editor(&path);
                 }
 
@@ -238,8 +241,8 @@ fn main() {
                     let dst = dst.resolve(username);
 
                     if matches!(overwrite, OverwriteBehavior::OverwriteExisting) || !dst.exists() {
-                        std::fs::create_dir_all(dst.parent().unwrap()).unwrap();
-                        std::fs::copy(src, dst).unwrap();
+                        fs::create_dir_all(dst.parent().unwrap()).unwrap();
+                        fs::copy(src, dst).unwrap();
                     }
                 }
 
@@ -250,10 +253,8 @@ fn main() {
 }
 
 fn run_editor(path: &Path) {
-    use std::os::unix::process::CommandExt;
-
-    std::process::Command::new("nano")
-        .arg0("rnano")
+    process::Command::new("nano")
+        .arg("--restricted")
         .arg(path)
         .spawn()
         .unwrap()
@@ -264,12 +265,11 @@ fn run_editor(path: &Path) {
 fn run_game(user: &users::User, game: &Game) {
     let _ = user;
     let _ = game;
-    use std::io::{stdout, Read, Write};
 
-    let mut rec = std::fs::File::create("test.ttyrec").unwrap();
+    let mut rec = fs::File::create("test.ttyrec").unwrap();
 
-    let mut child = std::process::Command::new("robotfindskitten")
-        .stdout(std::process::Stdio::piped())
+    let mut child = process::Command::new("robotfindskitten")
+        .stdout(process::Stdio::piped())
         .spawn()
         .unwrap();
 
@@ -298,8 +298,8 @@ fn run_game(user: &users::User, game: &Game) {
         rec.write_all(&buf).unwrap();
         rec.flush().unwrap();
 
-        stdout().write_all(&buf).unwrap();
-        stdout().flush().unwrap();
+        io::stdout().write_all(&buf).unwrap();
+        io::stdout().flush().unwrap();
 
         childout = childout_nb.into_blocking().unwrap();
     }
@@ -307,8 +307,8 @@ fn run_game(user: &users::User, game: &Game) {
     child.wait().unwrap();
 }
 
-fn unix_duration() -> std::time::Duration {
-    std::time::SystemTime::now()
-        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+fn unix_duration() -> Duration {
+    SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()
 }

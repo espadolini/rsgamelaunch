@@ -1,7 +1,7 @@
 use std::{
-    io::{stdin, stdout, Write},
+    io::{self, Write},
     os::unix::io::{AsRawFd, RawFd},
-    thread::sleep,
+    thread,
     time::Duration,
 };
 use termion::{event::Key, input::TermRead, raw::IntoRawMode};
@@ -9,10 +9,10 @@ use trim_in_place::TrimInPlace;
 
 pub(crate) fn trimmed_input(prompt: &str) -> String {
     print!("{}", prompt);
-    stdout().flush().unwrap();
+    io::stdout().flush().unwrap();
 
     let mut out = String::new();
-    stdin().read_line(&mut out).unwrap();
+    io::stdin().read_line(&mut out).unwrap();
     out.trim_in_place();
     out
 }
@@ -41,21 +41,21 @@ impl Drop for EchoOff {
 
 pub(crate) fn pass_input(prompt: &str) -> String {
     print!("{}", prompt);
-    stdout().flush().unwrap();
+    io::stdout().flush().unwrap();
 
-    let _noecho = EchoOff::new(stdout().as_raw_fd());
+    let _noecho = EchoOff::new(io::stdout().as_raw_fd());
     let mut out = String::new();
-    stdin().read_line(&mut out).unwrap();
+    io::stdin().read_line(&mut out).unwrap();
     out.truncate(out.len() - 1);
     out
 }
 
 pub(crate) fn char_input(prompt: &str) -> char {
     print!("{}", prompt);
-    stdout().flush().unwrap();
+    io::stdout().flush().unwrap();
 
-    let _raw = stdout().into_raw_mode().unwrap();
-    for key in stdin().keys().flatten() {
+    let _raw = io::stdout().into_raw_mode().unwrap();
+    for key in io::stdin().keys().flatten() {
         if let Key::Char(c) = key {
             return c;
         }
@@ -66,5 +66,5 @@ pub(crate) fn char_input(prompt: &str) -> char {
 
 pub(crate) fn flash_message(msg: &str) {
     println!("{}", msg);
-    sleep(Duration::from_secs(2));
+    thread::sleep(Duration::from_secs(2));
 }

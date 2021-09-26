@@ -2,7 +2,7 @@ use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
 };
-use rusqlite::{Connection, OpenFlags, OptionalExtension};
+use rusqlite::OptionalExtension;
 
 #[derive(Debug)]
 pub(crate) struct User {
@@ -11,8 +11,8 @@ pub(crate) struct User {
     contact: String,
 }
 
-fn open_users() -> Connection {
-    Connection::open_with_flags(crate::USERDB, OpenFlags::SQLITE_OPEN_READ_WRITE).unwrap()
+fn open_users() -> rusqlite::Connection {
+    rusqlite::Connection::open(crate::USERDB).unwrap()
 }
 
 pub(crate) fn get_user(username: &str) -> Option<User> {
